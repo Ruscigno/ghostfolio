@@ -302,6 +302,112 @@ Grant access of type _Public_ in the _Access_ tab of _My Ghostfolio_.
 }
 ```
 
+### Updating Brazilian Fund Prices via API
+
+Brazilian investment funds (identified by CNPJ) are not covered by any public market-data provider (Yahoo, CoinGecko, etc.). They can still be tracked in Ghostfolio using the `MANUAL` data source and an out-of-band price upload, run on whatever schedule you like (daily after the fund's NAV is published, for example).
+
+The flow has three steps. All requests require a JWT bearer token, obtained by exchanging your 50-character Security Token via `POST /api/v1/auth/anonymous`.
+
+#### 0. Obtain a JWT
+
+```bash
+JWT=$(curl -s -X POST http://localhost:3333/api/v1/auth/anonymous \
+  -H 'Content-Type: application/json' \
+  -d '{"accessToken":"<YOUR-50-CHAR-SECURITY-TOKEN>"}' | jq -r .authToken)
+```
+
+#### 1. Create the asset profile (once per fund)
+
+Convention: symbol = `GF_BR_FUND_<CNPJ-digits-only>` (e.g. `GF_BR_FUND_12345678000190`). The `GF_` prefix is **required** — without it, Ghostfolio replaces user-supplied MANUAL symbols with random UUIDs when the first `BUY` activity is created (see [`activities.service.ts:141-153`](apps/api/src/app/activities/activities.service.ts#L141-L153)), which would orphan the prices you upload.
+
+```bash
+SYMBOL=GF_BR_FUND_12345678000190
+
+# Create the profile (uses your base currency by default)
+curl -X POST "http://localhost:3333/api/v1/admin/profile-data/MANUAL/$SYMBOL" \
+  -H "Authorization: Bearer $JWT"
+
+# Patch metadata (name, currency, asset class)
+curl -X PATCH "http://localhost:3333/api/v1/admin/profile-data/MANUAL/$SYMBOL" \
+  -H "Authorization: Bearer $JWT" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Fundo Exemplo FIA",
+    "currency": "BRL",
+    "assetClass": "EQUITY",
+    "assetSubClass": "MUTUALFUND"
+  }'
+```
+
+For fixed-income funds use `"assetClass": "FIXED_INCOME"` and `"assetSubClass": "BOND"`.
+
+#### 2. Upload prices (whenever a new quote is available)
+
+The endpoint accepts an array, so you can backfill history or send a single point per day.
+
+```bash
+curl -X POST "http://localhost:3333/api/v1/market-data/MANUAL/$SYMBOL" \
+  -H "Authorization: Bearer $JWT" \
+  -H 'Content-Type: application/json' \
+  -d @- <<'EOF'
+{
+  "marketData": [
+    { "date": "2026-05-27", "marketPrice": 1.234567 },
+    { "date": "2026-05-26", "marketPrice": 1.231234 }
+  ]
+}
+EOF
+```
+
+#### JSON template
+
+Minimal payload for the bulk price upload (`POST /api/v1/market-data/MANUAL/:symbol`):
+
+```json
+{
+  "marketData": [
+    { "date": "YYYY-MM-DD", "marketPrice": 0.0 }
+  ]
+}
+```
+
+| Field         | Type                   | Description                                |
+| ------------- | ---------------------- | ------------------------------------------ |
+| `date`        | `string` (ISO-8601)    | Date the price applies to (optional — defaults to today if omitted, but recommended to set explicitly). |
+| `marketPrice` | `number`               | Cota / NAV value in the asset's currency. Required. |
+
+After upload, the fund's value will appear on the dashboard immediately. There is no scheduled price refresh for `MANUAL` symbols — re-run the upload whenever you want to record a new data point.
+
+### Registering Assets via `hybrid-data-svc`
+
+For each Ghostfolio asset that should be priced from `hybrid-data-svc` ([source](https://github.com/tickerbeats/hybrid-data-svc)), the helper script [scripts/register-asset.ts](scripts/register-asset.ts) wires up the `SymbolProfile` end-to-end:
+
+1. Probes the hybrid REST gateway (`GET /v1/profile/{tvSymbol}`).
+2. If hybrid doesn't cover the symbol yet, POSTs it to `/v1/assets` (Phase 3 endpoint — see the project's spec doc) and waits up to 60s for polling to start.
+3. If hybrid still doesn't cover, falls back to creating the profile with `dataSource: YAHOO` (equity/ETF) or `dataSource: COINGECKO` (crypto, requires `--coingecko-id`).
+4. Sets `symbolMapping` so the hybrid/Yahoo/CoinGecko variants travel with the profile.
+5. Triggers an initial gather (with `?range=1d` to avoid a known crash for fresh MANUAL assets).
+
+Symbol convention: `GF_<EXCHANGE>_<TICKER>`. The `GF_` prefix is **mandatory** for MANUAL assets (without it, [activities.service.ts:141-153](apps/api/src/app/activities/activities.service.ts#L141-L153) replaces the symbol with a random UUID when the first BUY is created).
+
+```bash
+# Single asset
+GHOSTFOLIO_ACCESS_TOKEN=<token> npx tsx scripts/register-asset.ts \
+  --symbol GF_BINANCE_BTCUSDT \
+  --name "Bitcoin / Tether USD" \
+  --asset-class CRYPTO \
+  --coingecko-id bitcoin
+
+# Batch (see scripts/assets-to-register.example.json for the shape)
+GHOSTFOLIO_ACCESS_TOKEN=<token> npx tsx scripts/register-asset.ts \
+  --batch scripts/assets-to-register.example.json
+```
+
+Env vars:
+- `HYBRID_URL` — where the script probes hybrid from the host (default `http://localhost:8003`).
+- `HYBRID_INTERNAL_URL` — what URL gets baked into the `scraperConfiguration` (default `http://host.docker.internal:8003`, which is what the Ghostfolio container can reach).
+- `HYBRID_BEARER` — optional bearer token for hybrid auth.
+
 ## Community Projects
 
 Discover a variety of community projects for Ghostfolio: https://github.com/topics/ghostfolio
