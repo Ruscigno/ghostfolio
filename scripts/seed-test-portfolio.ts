@@ -182,9 +182,12 @@ async function uploadMarketData(jwt: string, symbol: string, items: { date: stri
 }
 
 async function triggerGather(jwt: string, dataSource: string, symbol: string): Promise<void> {
-  await fetch(`${GHOSTFOLIO_URL}/api/v1/admin/gather/${dataSource}/${encodeURIComponent(symbol)}?range=1d`, {
+  const res = await fetch(`${GHOSTFOLIO_URL}/api/v1/admin/gather/${dataSource}/${encodeURIComponent(symbol)}?range=1d`, {
     method: 'POST', headers: auth(jwt)
   });
+  if (!res.ok) {
+    throw new Error(`Trigger gather ${dataSource}/${symbol}: ${res.status} ${await res.text()}`);
+  }
 }
 
 async function createActivity(jwt: string, body: Record<string, unknown>): Promise<void> {
@@ -194,26 +197,53 @@ async function createActivity(jwt: string, body: Record<string, unknown>): Promi
   if (!res.ok) throw new Error(`Create activity ${JSON.stringify(body)}: ${res.status} ${await res.text()}`);
 }
 
+// Teardown deletes intentionally tolerate "already gone" (HTTP 404 — and Ghostfolio's
+// 500 reply when an admin profile no longer exists), but they record every other
+// non-2xx response so the run can exit non-zero with a summary.
+//
+// Why Ghostfolio's `DELETE /api/v1/admin/profile-data/:dataSource/:symbol` returns 500
+// instead of 404 for missing rows: admin.controller.ts wraps all admin errors in a
+// generic 500. The body still says "Asset profile not found"; we don't currently
+// parse it because matching localised text is brittle. If/when that endpoint starts
+// returning a structured 404 we can tighten the predicate.
+const teardownIssues: string[] = [];
+
+function recordTeardownIssue(action: string, status: number, body: string): void {
+  teardownIssues.push(`${action}: HTTP ${status} ${body.slice(0, 200)}`);
+}
+
+function isExpectedTeardownMiss(status: number): boolean {
+  return status === 404 || status === 500;
+}
+
 async function deleteActivity(jwt: string, id: string): Promise<void> {
   const res = await fetch(`${GHOSTFOLIO_URL}/api/v1/activities/${id}`, { method: 'DELETE', headers: auth(jwt) });
-  if (res.status !== 200 && res.status !== 204) console.warn(`  ⚠ delete activity ${id}: ${res.status}`);
+  if (res.status === 200 || res.status === 204) return;
+  if (isExpectedTeardownMiss(res.status)) return;
+  recordTeardownIssue(`delete activity ${id}`, res.status, await res.text());
 }
 
 async function deleteProfile(jwt: string, dataSource: string, symbol: string): Promise<void> {
   const res = await fetch(`${GHOSTFOLIO_URL}/api/v1/admin/profile-data/${dataSource}/${encodeURIComponent(symbol)}`, {
     method: 'DELETE', headers: auth(jwt)
   });
-  if (res.status !== 200 && res.status !== 204) console.warn(`  ⚠ delete profile ${dataSource}/${symbol}: ${res.status}`);
+  if (res.status === 200 || res.status === 204) return;
+  if (isExpectedTeardownMiss(res.status)) return;
+  recordTeardownIssue(`delete profile ${dataSource}/${symbol}`, res.status, await res.text());
 }
 
 async function deleteAccount(jwt: string, id: string): Promise<void> {
   const res = await fetch(`${GHOSTFOLIO_URL}/api/v1/account/${id}`, { method: 'DELETE', headers: auth(jwt) });
-  if (res.status !== 200 && res.status !== 204) console.warn(`  ⚠ delete account ${id}: ${res.status}`);
+  if (res.status === 200 || res.status === 204) return;
+  if (isExpectedTeardownMiss(res.status)) return;
+  recordTeardownIssue(`delete account ${id}`, res.status, await res.text());
 }
 
 async function deletePlatform(jwt: string, id: string): Promise<void> {
   const res = await fetch(`${GHOSTFOLIO_URL}/api/v1/platform/${id}`, { method: 'DELETE', headers: auth(jwt) });
-  if (res.status !== 200 && res.status !== 204) console.warn(`  ⚠ delete platform ${id}: ${res.status}`);
+  if (res.status === 200 || res.status === 204) return;
+  if (isExpectedTeardownMiss(res.status)) return;
+  recordTeardownIssue(`delete platform ${id}`, res.status, await res.text());
 }
 
 // ───────────────────────── seed flow ─────────────────────────
@@ -337,6 +367,11 @@ async function teardown() {
   for (const a of legacy) await deleteActivity(jwt, a.id);
   await deleteProfile(jwt, 'MANUAL', 'GF_BTCUSDT_HYBRID');
 
+  if (teardownIssues.length > 0) {
+    console.error(`\n✗ Teardown completed with ${teardownIssues.length} unexpected error(s):`);
+    for (const issue of teardownIssues) console.error(`  - ${issue}`);
+    process.exit(1);
+  }
   console.log('► Done.');
 }
 

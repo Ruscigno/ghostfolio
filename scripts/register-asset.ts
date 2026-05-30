@@ -27,13 +27,13 @@
  *   HYBRID_BEARER            (optional, used for both probe and POST)
  */
 
-type AssetClass = 'EQUITY' | 'COMMODITY' | 'FIXED_INCOME' | 'LIQUIDITY' | 'REAL_ESTATE' | 'ALTERNATIVE_INVESTMENT';
-type AssetSubClass =
-  | 'STOCK' | 'ETF' | 'BOND' | 'CASH' | 'COLLECTIBLE' | 'COMMODITY' | 'CRYPTOCURRENCY' | 'LOAN'
-  | 'MUTUALFUND' | 'PRECIOUS_METAL' | 'PRIVATE_EQUITY';
-
-// "CRYPTO" is the hybrid-data-svc enum value; the Ghostfolio enum is EQUITY/CRYPTOCURRENCY.
-type HybridAssetClass = 'EQUITY' | 'CRYPTO' | 'ETF' | 'FUND';
+import {
+  deriveTvSymbol,
+  deriveYahooSymbol,
+  ghostfolioAssetClass,
+  ghostfolioAssetSubClass,
+  type HybridAssetClass
+} from './lib/symbol-derivation.ts';
 
 interface AssetSpec {
   /** Ghostfolio-facing symbol, must start with `GF_`. Pattern: GF_<EXCHANGE>_<TICKER>. */
@@ -110,51 +110,8 @@ async function loadSpecs(): Promise<AssetSpec[]> {
   return [single as AssetSpec];
 }
 
-// ───────────────────────── symbol derivation ─────────────────────────
-
-function deriveTvSymbol(gfSymbol: string): string {
-  // GF_BINANCE_BTCUSDT → BINANCE:BTCUSDT  (replace first underscore after GF_ with ':')
-  if (!gfSymbol.startsWith('GF_')) {
-    throw new Error(`Symbol must start with "GF_": got ${gfSymbol}`);
-  }
-  const rest = gfSymbol.slice(3);
-  const firstUnderscore = rest.indexOf('_');
-  if (firstUnderscore < 0) {
-    throw new Error(`Symbol ${gfSymbol} missing exchange segment (expected GF_<EXCHANGE>_<TICKER>).`);
-  }
-  return `${rest.slice(0, firstUnderscore)}:${rest.slice(firstUnderscore + 1)}`;
-}
-
-function deriveYahooSymbol(spec: AssetSpec): string | undefined {
-  if (spec.yahooSymbol) return spec.yahooSymbol;
-  if (spec.assetClass !== 'EQUITY' && spec.assetClass !== 'ETF') return undefined;
-  const tv = spec.tvSymbol ?? deriveTvSymbol(spec.symbol);
-  const [exchange, ticker] = tv.split(':');
-  switch (exchange) {
-    case 'NASDAQ':
-    case 'NYSE':
-    case 'AMEX':         return ticker;
-    case 'BMFBOVESPA':
-    case 'BVMF':         return `${ticker}.SA`;
-    case 'LSE':          return `${ticker}.L`;
-    case 'TSX':          return `${ticker}.TO`;
-    default:             return undefined;
-  }
-}
-
-function ghostfolioAssetSubClass(spec: AssetSpec): AssetSubClass {
-  switch (spec.assetClass) {
-    case 'CRYPTO':       return 'CRYPTOCURRENCY';
-    case 'ETF':          return 'ETF';
-    case 'FUND':         return 'MUTUALFUND';
-    case 'EQUITY':       return 'STOCK';
-  }
-}
-
-function ghostfolioAssetClass(spec: AssetSpec): AssetClass {
-  // Ghostfolio has no "CRYPTO" enum at the asset-class level; map to EQUITY.
-  return 'EQUITY';
-}
+// Symbol derivation helpers live in ./lib/symbol-derivation.ts so they can be
+// unit-tested without the CLI scaffolding. Imported at the top of this file.
 
 // ───────────────────────── hybrid API ─────────────────────────
 
@@ -252,7 +209,9 @@ async function triggerGather(jwt: string, dataSource: string, symbol: string): P
     `${GHOSTFOLIO_URL}/api/v1/admin/gather/${dataSource}/${encodeURIComponent(symbol)}?range=1d`,
     { method: 'POST', headers: gfAuth(jwt) }
   );
-  if (!res.ok) console.error(`  ⚠ gather ${dataSource}/${symbol}: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    throw new Error(`gather ${dataSource}/${symbol}: ${res.status} ${await res.text()}`);
+  }
 }
 
 // ───────────────────────── workflow ─────────────────────────
