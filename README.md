@@ -390,23 +390,34 @@ For each Ghostfolio asset that should be priced from `hybrid-data-svc` ([source]
 
 Symbol convention: `GF_<EXCHANGE>_<TICKER>`. The `GF_` prefix is **mandatory** for MANUAL assets (without it, [activities.service.ts:141-153](apps/api/src/app/activities/activities.service.ts#L141-L153) replaces the symbol with a random UUID when the first BUY is created).
 
+**Loading the access token without leaking it into shell history.** Avoid inlining the token on the command line — `bash`/`zsh` record full argv in `.bash_history` / `.zsh_history`, and `ps` exposes it while the process runs. Source it from a gitignored `.env` instead (the same `.env` Docker Compose already uses):
+
 ```bash
-# Single asset
-GHOSTFOLIO_ACCESS_TOKEN=<token> npx tsx scripts/register-asset.ts \
+# Load all variables from .env into the current shell, run, then drop them.
+set -a; source .env; set +a
+npx tsx scripts/register-asset.ts \
   --symbol GF_BINANCE_BTCUSDT \
   --name "Bitcoin / Tether USD" \
   --asset-class CRYPTO \
   --coingecko-id bitcoin
 
 # Batch (see scripts/assets-to-register.example.json for the shape)
-GHOSTFOLIO_ACCESS_TOKEN=<token> npx tsx scripts/register-asset.ts \
+set -a; source .env; set +a
+npx tsx scripts/register-asset.ts \
   --batch scripts/assets-to-register.example.json
 ```
 
 Env vars:
+- `GHOSTFOLIO_ACCESS_TOKEN` — your 50–128 character Security Token; **required**, sourced from `.env`.
 - `HYBRID_URL` — where the script probes hybrid from the host (default `http://localhost:8003`).
 - `HYBRID_INTERNAL_URL` — what URL gets baked into the `scraperConfiguration` (default `http://host.docker.internal:8003`, which is what the Ghostfolio container can reach).
 - `HYBRID_BEARER` — optional bearer token for hybrid auth.
+
+Run the unit tests covering the pure helpers (`deriveTvSymbol`, `deriveYahooSymbol`, asset-class mappings):
+
+```bash
+node --experimental-strip-types --test scripts/__tests__/symbol-derivation.test.ts
+```
 
 ## Community Projects
 
