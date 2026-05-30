@@ -30,6 +30,7 @@ npm-debug.log
 .cursor/rules/nx-rules.mdc
 .env
 .env.prod
+token.sh
 .github/instructions/nx.instructions.md
 .nx/cache
 .nx/polygraph

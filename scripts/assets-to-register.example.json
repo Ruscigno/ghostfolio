@@ -1,0 +1,45 @@
+[
+  {
+    "symbol": "GF_BINANCE_BTCUSDT",
+    "name": "Bitcoin / Tether USD",
+    "assetClass": "CRYPTO",
+    "currency": "USD",
+    "coingeckoId": "bitcoin"
+  },
+  {
+    "symbol": "GF_BINANCE_ETHUSDT",
+    "name": "Ethereum / Tether USD",
+    "assetClass": "CRYPTO",
+    "currency": "USD",
+    "coingeckoId": "ethereum"
+  },
+  {
+    "symbol": "GF_OKX_BTCUSDT",
+    "name": "Bitcoin / Tether USD (OKX)",
+    "assetClass": "CRYPTO",
+    "currency": "USD",
+    "coingeckoId": "bitcoin"
+  },
+  {
+    "symbol": "GF_NASDAQ_AAPL",
+    "name": "Apple Inc.",
+    "assetClass": "EQUITY",
+    "currency": "USD",
+    "isin": "US0378331005",
+    "country": "US"
+  },
+  {
+    "symbol": "GF_NYSE_VOO",
+    "name": "Vanguard S&P 500 ETF",
+    "assetClass": "ETF",
+    "currency": "USD",
+    "country": "US"
+  },
+  {
+    "symbol": "GF_BMFBOVESPA_PETR4",
+    "name": "Petrobras PN",
+    "assetClass": "EQUITY",
+    "currency": "BRL",
+    "country": "BR"
+  }
+]
