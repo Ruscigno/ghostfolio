@@ -4,7 +4,9 @@ import {
   deriveTvSymbol,
   deriveYahooSymbol,
   ghostfolioAssetClass,
-  ghostfolioAssetSubClass
+  ghostfolioAssetSubClass,
+  validateSpec,
+  VALID_ASSET_CLASSES
 } from '../lib/symbol-derivation.ts';
 
 describe('deriveTvSymbol', () => {
@@ -90,5 +92,60 @@ describe('ghostfolioAssetSubClass', () => {
     assert.equal(ghostfolioAssetSubClass({ symbol: 'GF_X_Y', assetClass: 'ETF'    }), 'ETF');
     assert.equal(ghostfolioAssetSubClass({ symbol: 'GF_X_Y', assetClass: 'FUND'   }), 'MUTUALFUND');
     assert.equal(ghostfolioAssetSubClass({ symbol: 'GF_X_Y', assetClass: 'EQUITY' }), 'STOCK');
+  });
+
+  it('covers every VALID_ASSET_CLASSES value (no class falls through to undefined)', () => {
+    for (const assetClass of VALID_ASSET_CLASSES) {
+      assert.ok(ghostfolioAssetSubClass({ symbol: 'GF_X_Y', assetClass }) !== undefined);
+    }
+  });
+});
+
+describe('VALID_ASSET_CLASSES', () => {
+  it('is the single source of truth for the hybrid asset classes', () => {
+    assert.deepEqual([...VALID_ASSET_CLASSES], ['EQUITY', 'CRYPTO', 'ETF', 'FUND']);
+  });
+});
+
+describe('validateSpec', () => {
+  it('accepts a well-formed spec (each valid asset class)', () => {
+    for (const assetClass of VALID_ASSET_CLASSES) {
+      assert.doesNotThrow(() =>
+        validateSpec({ symbol: 'GF_NASDAQ_AAPL', name: 'Apple', assetClass }, 'test')
+      );
+    }
+  });
+
+  it('throws when a required field is missing', () => {
+    assert.throws(() => validateSpec({ name: 'Apple', assetClass: 'EQUITY' }, 'test'), /are all required/);
+    assert.throws(() => validateSpec({ symbol: 'GF_NASDAQ_AAPL', assetClass: 'EQUITY' }, 'test'), /are all required/);
+    assert.throws(() => validateSpec({ symbol: 'GF_NASDAQ_AAPL', name: 'Apple' }, 'test'), /are all required/);
+    assert.throws(() => validateSpec({}, 'test'), /are all required/);
+  });
+
+  it('throws when the symbol does not start with GF_', () => {
+    assert.throws(
+      () => validateSpec({ symbol: 'AAPL', name: 'Apple', assetClass: 'EQUITY' }, 'test'),
+      /must start with "GF_"/
+    );
+  });
+
+  it('throws when the asset class is not in the allow-list', () => {
+    assert.throws(
+      () => validateSpec({ symbol: 'GF_NASDAQ_AAPL', name: 'Apple', assetClass: 'BOGUS' }, 'test'),
+      /must be one of EQUITY, CRYPTO, ETF, FUND/
+    );
+    // Wrong casing is rejected too — the allow-list is exact.
+    assert.throws(
+      () => validateSpec({ symbol: 'GF_BINANCE_BTCUSDT', name: 'BTC', assetClass: 'crypto' }, 'test'),
+      /must be one of/
+    );
+  });
+
+  it('prefixes the error with the supplied context', () => {
+    assert.throws(
+      () => validateSpec({ symbol: 'AAPL', name: 'Apple', assetClass: 'EQUITY' }, 'batch.json[3]'),
+      /^Error: batch\.json\[3\]:/
+    );
   });
 });

@@ -32,6 +32,7 @@ import {
   deriveYahooSymbol,
   ghostfolioAssetClass,
   ghostfolioAssetSubClass,
+  validateSpec,
   type HybridAssetClass
 } from './lib/symbol-derivation.ts';
 
@@ -97,17 +98,25 @@ function parseArgs(argv: string[]): { batch?: string; single?: Partial<AssetSpec
 
 const { batch, single, addOnMiss } = parseArgs(process.argv);
 
+// Validation lives in ./lib/symbol-derivation.ts (validateSpec) so it shares the
+// VALID_ASSET_CLASSES allow-list with the HybridAssetClass type and is unit-tested.
 async function loadSpecs(): Promise<AssetSpec[]> {
   if (batch) {
     const { readFile } = await import('node:fs/promises');
     const content = await readFile(batch, 'utf-8');
-    return JSON.parse(content) as AssetSpec[];
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Batch file ${batch} must contain a JSON array of asset specs.`);
+    }
+    parsed.forEach((spec, i) => validateSpec(spec, `${batch}[${i}]`));
+    return parsed as AssetSpec[];
   }
   if (!single.symbol || !single.name || !single.assetClass) {
     console.error('ERROR: --symbol, --name and --asset-class are required (or use --batch).');
     process.exit(1);
   }
-  return [single as AssetSpec];
+  validateSpec(single, 'CLI args');
+  return [single];
 }
 
 // Symbol derivation helpers live in ./lib/symbol-derivation.ts so they can be
@@ -226,6 +235,7 @@ async function processOne(jwt: string, spec: AssetSpec): Promise<'hybrid' | 'fal
   }
 
   if (covered) {
+    const yahooMapping = deriveYahooSymbol(spec);
     await ensureProfile(jwt, 'MANUAL', spec.symbol);
     await patchProfile(jwt, 'MANUAL', spec.symbol, {
       name: spec.name,
@@ -234,7 +244,7 @@ async function processOne(jwt: string, spec: AssetSpec): Promise<'hybrid' | 'fal
       assetSubClass: ghostfolioAssetSubClass(spec),
       symbolMapping: {
         HYBRID: tvSymbol,
-        ...(deriveYahooSymbol(spec) ? { YAHOO: deriveYahooSymbol(spec) } : {}),
+        ...(yahooMapping ? { YAHOO: yahooMapping } : {}),
         ...(spec.coingeckoId ? { COINGECKO: spec.coingeckoId } : {})
       },
       scraperConfiguration: {

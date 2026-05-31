@@ -4,7 +4,14 @@
  * register-asset.ts CLI so they can be unit-tested in isolation.
  */
 
-export type HybridAssetClass = 'EQUITY' | 'CRYPTO' | 'ETF' | 'FUND';
+/**
+ * Single source of truth for the hybrid asset classes: the runtime list and the
+ * `HybridAssetClass` type are derived from the same array, so adding a class here
+ * keeps the type and the `validateSpec` allow-list in sync automatically.
+ */
+export const VALID_ASSET_CLASSES = ['EQUITY', 'CRYPTO', 'ETF', 'FUND'] as const;
+
+export type HybridAssetClass = (typeof VALID_ASSET_CLASSES)[number];
 
 export type GhostfolioAssetClass =
   | 'EQUITY' | 'COMMODITY' | 'FIXED_INCOME' | 'LIQUIDITY' | 'REAL_ESTATE' | 'ALTERNATIVE_INVESTMENT';
@@ -82,5 +89,32 @@ export function ghostfolioAssetSubClass(spec: SymbolSpec): GhostfolioAssetSubCla
     case 'ETF':    return 'ETF';
     case 'FUND':   return 'MUTUALFUND';
     case 'EQUITY': return 'STOCK';
+  }
+}
+
+/**
+ * Runtime guard for the minimum fields every asset spec must carry, regardless of
+ * where it came from (CLI flags or batch JSON). Throws a descriptive error keyed by
+ * `context` so a typo fails fast instead of flowing an unknown assetClass into
+ * ghostfolioAssetSubClass() (which would return undefined) or the hybrid POST body.
+ *
+ * Generic so callers keep their richer spec type after the assertion narrows it.
+ */
+export function validateSpec<
+  T extends { symbol?: string; name?: string; assetClass?: string }
+>(
+  spec: T,
+  context: string
+): asserts spec is T & { symbol: string; name: string; assetClass: HybridAssetClass } {
+  if (!spec.symbol || !spec.name || !spec.assetClass) {
+    throw new Error(`${context}: "symbol", "name" and "assetClass" are all required.`);
+  }
+  if (!spec.symbol.startsWith('GF_')) {
+    throw new Error(`${context}: symbol "${spec.symbol}" must start with "GF_".`);
+  }
+  if (!(VALID_ASSET_CLASSES as readonly string[]).includes(spec.assetClass)) {
+    throw new Error(
+      `${context}: assetClass "${spec.assetClass}" must be one of ${VALID_ASSET_CLASSES.join(', ')}.`
+    );
   }
 }

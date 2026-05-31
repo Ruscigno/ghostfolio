@@ -197,23 +197,22 @@ async function createActivity(jwt: string, body: Record<string, unknown>): Promi
   if (!res.ok) throw new Error(`Create activity ${JSON.stringify(body)}: ${res.status} ${await res.text()}`);
 }
 
-// Teardown deletes intentionally tolerate "already gone" (HTTP 404 — and Ghostfolio's
-// 500 reply when an admin profile no longer exists), but they record every other
-// non-2xx response so the run can exit non-zero with a summary.
+// Teardown deletes tolerate "already gone" (HTTP 404) but record every other non-2xx
+// response so the run can exit non-zero with a summary.
 //
-// Why Ghostfolio's `DELETE /api/v1/admin/profile-data/:dataSource/:symbol` returns 500
-// instead of 404 for missing rows: admin.controller.ts wraps all admin errors in a
-// generic 500. The body still says "Asset profile not found"; we don't currently
-// parse it because matching localised text is brittle. If/when that endpoint starts
-// returning a structured 404 we can tighten the predicate.
+// HTTP 500 is tolerated ONLY for `DELETE /api/v1/admin/profile-data/:dataSource/:symbol`:
+// admin.controller.ts wraps all admin errors in a generic 500, so a missing profile comes
+// back as 500 "Asset profile not found" rather than 404. We don't parse the body because
+// matching localised text is brittle; if/when that endpoint returns a structured 404 we can
+// drop the special case. For every other endpoint a 500 is a genuine error we must surface.
 const teardownIssues: string[] = [];
 
 function recordTeardownIssue(action: string, status: number, body: string): void {
   teardownIssues.push(`${action}: HTTP ${status} ${body.slice(0, 200)}`);
 }
 
-function isExpectedTeardownMiss(status: number): boolean {
-  return status === 404 || status === 500;
+function isExpectedTeardownMiss(status: number, tolerate500 = false): boolean {
+  return status === 404 || (tolerate500 && status === 500);
 }
 
 async function deleteActivity(jwt: string, id: string): Promise<void> {
@@ -228,7 +227,7 @@ async function deleteProfile(jwt: string, dataSource: string, symbol: string): P
     method: 'DELETE', headers: auth(jwt)
   });
   if (res.status === 200 || res.status === 204) return;
-  if (isExpectedTeardownMiss(res.status)) return;
+  if (isExpectedTeardownMiss(res.status, /* tolerate500 */ true)) return;
   recordTeardownIssue(`delete profile ${dataSource}/${symbol}`, res.status, await res.text());
 }
 
@@ -293,7 +292,9 @@ async function seed() {
   await uploadMarketData(jwt, BR_FUND.symbol, BR_FUND.navHistory);
 
   console.log('► Creating activities…');
-  // De-dupe: skip activities whose (symbol, dataSource, date, type, quantity) already match an existing row.
+  // De-dupe: skip activities whose (dataSource, symbol, type, date) already match an existing row.
+  // Quantity/unitPrice are intentionally NOT part of the key, so this seed set must not contain two
+  // entries sharing those four fields (it currently doesn't) — otherwise the second would be skipped.
   const existing = await listActivities(jwt);
   const seen = new Set(existing.map(a => `${a.SymbolProfile.dataSource}|${a.SymbolProfile.symbol}|${a.type}|${a.date.slice(0,10)}`));
 
@@ -361,9 +362,11 @@ async function teardown() {
   const interPlat = platforms.find(p => p.name === BR_PLATFORM.name);
   if (interPlat) await deletePlatform(jwt, interPlat.id);
 
-  // Sweep the legacy GF_BTCUSDT_HYBRID artefact from the earlier smoke test if present
+  // Sweep the legacy GF_BTCUSDT_HYBRID artefact from the earlier smoke test if present.
+  // Reuse the activity list fetched above — the loop above only deletes `ourSymbols`, so any
+  // legacy rows are still present in `existing` and don't warrant a second GET /activities.
   console.log('► Sweeping legacy GF_BTCUSDT_HYBRID artefact (if any)…');
-  const legacy = (await listActivities(jwt)).filter(a => a.SymbolProfile.symbol === 'GF_BTCUSDT_HYBRID');
+  const legacy = existing.filter(a => a.SymbolProfile.symbol === 'GF_BTCUSDT_HYBRID');
   for (const a of legacy) await deleteActivity(jwt, a.id);
   await deleteProfile(jwt, 'MANUAL', 'GF_BTCUSDT_HYBRID');
 
@@ -383,7 +386,8 @@ async function summary(jwt: string) {
   console.log('\nHoldings:');
   for (const h of holdings.holdings.sort((a, b) => b.valueInBaseCurrency - a.valueInBaseCurrency)) {
     const label = (h.name ?? h.symbol ?? '<unnamed>').padEnd(40);
-    console.log(`  ${label}  ${h.dataSource.padEnd(7)}  qty=${h.quantity.toString().padStart(8)}  px=${h.marketPrice.toFixed(2).padStart(10)} ${h.currency}  → ${h.valueInBaseCurrency.toFixed(2).padStart(10)} ${h.currency}  (${(h.netPerformancePercent * 100).toFixed(2)}%)`);
+    // px is in the holding's own currency; valueInBaseCurrency is in the instance base currency (no per-holding suffix).
+    console.log(`  ${label}  ${h.dataSource.padEnd(7)}  qty=${h.quantity.toString().padStart(8)}  px=${h.marketPrice.toFixed(2).padStart(10)} ${h.currency}  → ${h.valueInBaseCurrency.toFixed(2).padStart(10)} (base)  (${(h.netPerformancePercent * 100).toFixed(2)}%)`);
   }
   const total = holdings.holdings.reduce((s, h) => s + h.valueInBaseCurrency, 0);
   console.log(`\n  Total portfolio value (base currency): ${total.toFixed(2)} USD across ${holdings.holdings.length} holdings.`);
