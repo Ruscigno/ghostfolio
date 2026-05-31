@@ -306,7 +306,7 @@ Grant access of type _Public_ in the _Access_ tab of _My Ghostfolio_.
 
 Brazilian investment funds (identified by CNPJ) are not covered by any public market-data provider (Yahoo, CoinGecko, etc.). They can still be tracked in Ghostfolio using the `MANUAL` data source and an out-of-band price upload, run on whatever schedule you like (daily after the fund's NAV is published, for example).
 
-The flow has three steps. All requests require a JWT bearer token, obtained by exchanging your 50-character Security Token via `POST /api/v1/auth/anonymous`.
+The flow has three steps. All requests require a JWT bearer token, obtained by exchanging your 128-character Security Token via `POST /api/v1/auth/anonymous`.
 
 #### 0. Obtain a JWT
 
@@ -373,7 +373,7 @@ Minimal payload for the bulk price upload (`POST /api/v1/market-data/MANUAL/:sym
 
 | Field         | Type                   | Description                                |
 | ------------- | ---------------------- | ------------------------------------------ |
-| `date`        | `string` (ISO-8601)    | Date the price applies to (optional — defaults to today if omitted, but recommended to set explicitly). |
+| `date`        | `string` (ISO-8601)    | Date the price applies to. Always set it explicitly — the endpoint runs `parseISO(date)` unconditionally, so an omitted `date` yields an invalid date rather than today. |
 | `marketPrice` | `number`               | Cota / NAV value in the asset's currency. Required. |
 
 After upload, the fund's value will appear on the dashboard immediately. There is no scheduled price refresh for `MANUAL` symbols — re-run the upload whenever you want to record a new data point.
@@ -408,7 +408,7 @@ npx tsx scripts/register-asset.ts \
 ```
 
 Env vars:
-- `GHOSTFOLIO_ACCESS_TOKEN` — your 50–128 character Security Token; **required**, sourced from `.env`.
+- `GHOSTFOLIO_ACCESS_TOKEN` — your 128-character Security Token; **required**, sourced from `.env`.
 - `HYBRID_URL` — where the script probes hybrid from the host (default `http://localhost:8003`).
 - `HYBRID_INTERNAL_URL` — what URL gets baked into the `scraperConfiguration` (default `http://host.docker.internal:8003`, which is what the Ghostfolio container can reach).
 - `HYBRID_BEARER` — optional bearer token for hybrid auth.

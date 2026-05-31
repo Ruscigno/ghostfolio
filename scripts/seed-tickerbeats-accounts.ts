@@ -35,7 +35,7 @@ const ACCOUNTS: AccountSpec[] = [
   { name: 'Nomad', platformName: 'Nomad Global', currency: 'USD', balance: 0 }
 ];
 
-const API_URL = process.env.GHOSTFOLIO_API_URL ?? 'http://localhost:3333';
+const API_URL = (process.env.GHOSTFOLIO_API_URL ?? 'http://localhost:3333').replace(/\/$/, '');
 const ACCESS_TOKEN = process.env.GHOSTFOLIO_ACCESS_TOKEN;
 
 if (!ACCESS_TOKEN) {

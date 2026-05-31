@@ -97,17 +97,42 @@ function parseArgs(argv: string[]): { batch?: string; single?: Partial<AssetSpec
 
 const { batch, single, addOnMiss } = parseArgs(process.argv);
 
+const VALID_ASSET_CLASSES: HybridAssetClass[] = ['EQUITY', 'CRYPTO', 'ETF', 'FUND'];
+
+// Validate at parse time so a typo in the batch JSON (or --asset-class) fails fast
+// with a clear message, instead of silently flowing an unknown assetClass into
+// ghostfolioAssetSubClass() (which would return undefined) or the hybrid POST body.
+function validateSpec(spec: Partial<AssetSpec>, context: string): asserts spec is AssetSpec {
+  if (!spec.symbol || !spec.name || !spec.assetClass) {
+    throw new Error(`${context}: "symbol", "name" and "assetClass" are all required.`);
+  }
+  if (!spec.symbol.startsWith('GF_')) {
+    throw new Error(`${context}: symbol "${spec.symbol}" must start with "GF_".`);
+  }
+  if (!VALID_ASSET_CLASSES.includes(spec.assetClass)) {
+    throw new Error(
+      `${context}: assetClass "${spec.assetClass}" must be one of ${VALID_ASSET_CLASSES.join(', ')}.`
+    );
+  }
+}
+
 async function loadSpecs(): Promise<AssetSpec[]> {
   if (batch) {
     const { readFile } = await import('node:fs/promises');
     const content = await readFile(batch, 'utf-8');
-    return JSON.parse(content) as AssetSpec[];
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Batch file ${batch} must contain a JSON array of asset specs.`);
+    }
+    parsed.forEach((spec, i) => validateSpec(spec, `${batch}[${i}]`));
+    return parsed as AssetSpec[];
   }
   if (!single.symbol || !single.name || !single.assetClass) {
     console.error('ERROR: --symbol, --name and --asset-class are required (or use --batch).');
     process.exit(1);
   }
-  return [single as AssetSpec];
+  validateSpec(single, 'CLI args');
+  return [single];
 }
 
 // Symbol derivation helpers live in ./lib/symbol-derivation.ts so they can be
@@ -226,6 +251,7 @@ async function processOne(jwt: string, spec: AssetSpec): Promise<'hybrid' | 'fal
   }
 
   if (covered) {
+    const yahooMapping = deriveYahooSymbol(spec);
     await ensureProfile(jwt, 'MANUAL', spec.symbol);
     await patchProfile(jwt, 'MANUAL', spec.symbol, {
       name: spec.name,
@@ -234,7 +260,7 @@ async function processOne(jwt: string, spec: AssetSpec): Promise<'hybrid' | 'fal
       assetSubClass: ghostfolioAssetSubClass(spec),
       symbolMapping: {
         HYBRID: tvSymbol,
-        ...(deriveYahooSymbol(spec) ? { YAHOO: deriveYahooSymbol(spec) } : {}),
+        ...(yahooMapping ? { YAHOO: yahooMapping } : {}),
         ...(spec.coingeckoId ? { COINGECKO: spec.coingeckoId } : {})
       },
       scraperConfiguration: {
