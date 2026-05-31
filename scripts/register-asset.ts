@@ -32,6 +32,7 @@ import {
   deriveYahooSymbol,
   ghostfolioAssetClass,
   ghostfolioAssetSubClass,
+  validateSpec,
   type HybridAssetClass
 } from './lib/symbol-derivation.ts';
 
@@ -97,25 +98,8 @@ function parseArgs(argv: string[]): { batch?: string; single?: Partial<AssetSpec
 
 const { batch, single, addOnMiss } = parseArgs(process.argv);
 
-const VALID_ASSET_CLASSES: HybridAssetClass[] = ['EQUITY', 'CRYPTO', 'ETF', 'FUND'];
-
-// Validate at parse time so a typo in the batch JSON (or --asset-class) fails fast
-// with a clear message, instead of silently flowing an unknown assetClass into
-// ghostfolioAssetSubClass() (which would return undefined) or the hybrid POST body.
-function validateSpec(spec: Partial<AssetSpec>, context: string): asserts spec is AssetSpec {
-  if (!spec.symbol || !spec.name || !spec.assetClass) {
-    throw new Error(`${context}: "symbol", "name" and "assetClass" are all required.`);
-  }
-  if (!spec.symbol.startsWith('GF_')) {
-    throw new Error(`${context}: symbol "${spec.symbol}" must start with "GF_".`);
-  }
-  if (!VALID_ASSET_CLASSES.includes(spec.assetClass)) {
-    throw new Error(
-      `${context}: assetClass "${spec.assetClass}" must be one of ${VALID_ASSET_CLASSES.join(', ')}.`
-    );
-  }
-}
-
+// Validation lives in ./lib/symbol-derivation.ts (validateSpec) so it shares the
+// VALID_ASSET_CLASSES allow-list with the HybridAssetClass type and is unit-tested.
 async function loadSpecs(): Promise<AssetSpec[]> {
   if (batch) {
     const { readFile } = await import('node:fs/promises');
