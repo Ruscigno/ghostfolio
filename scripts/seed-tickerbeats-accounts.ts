@@ -2,7 +2,7 @@
  * Seed Tickerbeats brokerage platforms and accounts into a fresh Ghostfolio instance.
  *
  * Usage:
- *   GHOSTFOLIO_ACCESS_TOKEN=<50-char-security-token> \
+ *   GHOSTFOLIO_ACCESS_TOKEN=<128-char-security-token> \
  *   [GHOSTFOLIO_API_URL=http://localhost:3333] \
  *   npx tsx scripts/seed-tickerbeats-accounts.ts
  *
