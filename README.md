@@ -313,7 +313,7 @@ The flow has three steps. All requests require a JWT bearer token, obtained by e
 ```bash
 JWT=$(curl -s -X POST http://localhost:3333/api/v1/auth/anonymous \
   -H 'Content-Type: application/json' \
-  -d '{"accessToken":"<YOUR-50-CHAR-SECURITY-TOKEN>"}' | jq -r .authToken)
+  -d '{"accessToken":"<YOUR-128-CHAR-SECURITY-TOKEN>"}' | jq -r .authToken)
 ```
 
 #### 1. Create the asset profile (once per fund)
