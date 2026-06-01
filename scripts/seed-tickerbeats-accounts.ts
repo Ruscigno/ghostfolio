@@ -2,7 +2,7 @@
  * Seed Tickerbeats brokerage platforms and accounts into a fresh Ghostfolio instance.
  *
  * Usage:
- *   GHOSTFOLIO_ACCESS_TOKEN=<50-char-security-token> \
+ *   GHOSTFOLIO_ACCESS_TOKEN=<128-char-security-token> \
  *   [GHOSTFOLIO_API_URL=http://localhost:3333] \
  *   npx tsx scripts/seed-tickerbeats-accounts.ts
  *
@@ -25,14 +25,20 @@ const PLATFORMS: PlatformSpec[] = [
   { name: 'Binance', url: 'https://www.binance.com' },
   { name: 'OKX', url: 'https://www.okx.com' },
   { name: 'Interactive Brokers', url: 'https://www.interactivebrokers.com' },
-  { name: 'Nomad Global', url: 'https://www.nomadglobal.com' }
+  { name: 'Nomad Global', url: 'https://www.nomadglobal.com' },
+  // url drives the account icon: Ghostfolio fetches the favicon from the
+  // platform url at runtime (logo.service.ts), it does not store an image.
+  { name: 'XP Investimentos', url: 'https://xpi.com.br' },
+  { name: 'BTG Pactual', url: 'https://btgpactual.com' }
 ];
 
 const ACCOUNTS: AccountSpec[] = [
   { name: 'Binance Spot', platformName: 'Binance', currency: 'USD', balance: 0 },
   { name: 'OKX Spot', platformName: 'OKX', currency: 'USD', balance: 0 },
   { name: 'IBKR', platformName: 'Interactive Brokers', currency: 'USD', balance: 0 },
-  { name: 'Nomad', platformName: 'Nomad Global', currency: 'USD', balance: 0 }
+  { name: 'Nomad', platformName: 'Nomad Global', currency: 'USD', balance: 0 },
+  { name: 'XP Investimentos', platformName: 'XP Investimentos', currency: 'BRL', balance: 0 },
+  { name: 'BTG Investimentos', platformName: 'BTG Pactual', currency: 'BRL', balance: 0 }
 ];
 
 const API_URL = (process.env.GHOSTFOLIO_API_URL ?? 'http://localhost:3333').replace(/\/$/, '');
@@ -40,7 +46,7 @@ const ACCESS_TOKEN = process.env.GHOSTFOLIO_ACCESS_TOKEN;
 
 if (!ACCESS_TOKEN) {
   console.error(
-    'ERROR: GHOSTFOLIO_ACCESS_TOKEN is required (the 50-character security token shown when the admin user was created).'
+    'ERROR: GHOSTFOLIO_ACCESS_TOKEN is required (the 128-character security token shown when the admin user was created).'
   );
   process.exit(1);
 }
