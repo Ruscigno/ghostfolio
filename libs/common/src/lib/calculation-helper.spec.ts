@@ -54,6 +54,17 @@ describe('CalculationHelper', () => {
   });
 
   describe('getIntervalFromDateRange', () => {
+    beforeAll(() => {
+      // Freeze time so new Date() in the function under test and in the
+      // assertions resolve to the same instant — otherwise a run that crosses
+      // midnight could make the two diverge (temporal flakiness).
+      jest.useFakeTimers().setSystemTime(new Date('2026-06-02T12:00:00.000Z'));
+    });
+
+    afterAll(() => {
+      jest.useRealTimers();
+    });
+
     it('derives a rolling 1-week start date', () => {
       const { startDate } = getIntervalFromDateRange({ dateRange: '1w' });
 
