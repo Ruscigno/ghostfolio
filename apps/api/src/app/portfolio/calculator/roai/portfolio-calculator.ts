@@ -846,6 +846,8 @@ export class RoaiPortfolioCalculator extends PortfolioCalculator {
 
     for (const dateRange of [
       '1d',
+      '1m',
+      '1w',
       '1y',
       '3m',
       '5y',

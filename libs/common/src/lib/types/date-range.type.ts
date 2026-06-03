@@ -1,5 +1,7 @@
 export type DateRange =
   | '1d'
+  | '1m'
+  | '1w'
   | '1y'
   | '3m'
   | '5y'
