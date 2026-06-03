@@ -208,6 +208,14 @@ export class GfAssetProfileDialogComponent implements OnInit {
       value: 'mtd'
     },
     {
+      label: '3 ' + $localize`months` + ' (' + $localize`3M` + ')',
+      value: '3m'
+    },
+    {
+      label: '6 ' + $localize`months` + ' (' + $localize`6M` + ')',
+      value: '6m'
+    },
+    {
       label: $localize`Current year` + ' (' + $localize`YTD` + ')',
       value: 'ytd'
     },

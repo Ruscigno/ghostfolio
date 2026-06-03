@@ -382,6 +382,14 @@ export class GfAssistantComponent implements OnChanges, OnDestroy, OnInit {
         value: 'mtd'
       },
       {
+        label: '3 ' + $localize`months` + ' (' + $localize`3M` + ')',
+        value: '3m'
+      },
+      {
+        label: '6 ' + $localize`months` + ' (' + $localize`6M` + ')',
+        value: '6m'
+      },
+      {
         label: $localize`Year to date` + ' (' + $localize`YTD` + ')',
         value: 'ytd'
       }

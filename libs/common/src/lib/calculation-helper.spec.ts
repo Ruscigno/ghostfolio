@@ -1,6 +1,11 @@
 import { Big } from 'big.js';
+import { subMonths } from 'date-fns';
 
-import { getAnnualizedPerformancePercent } from './calculation-helper';
+import {
+  getAnnualizedPerformancePercent,
+  getIntervalFromDateRange
+} from './calculation-helper';
+import { resetHours } from './helper';
 
 describe('CalculationHelper', () => {
   describe('annualized performance percentage', () => {
@@ -45,6 +50,32 @@ describe('CalculationHelper', () => {
           netPerformancePercentage: new Big(0.2374)
         }).toNumber()
       ).toBeCloseTo(0.145);
+    });
+  });
+
+  describe('getIntervalFromDateRange', () => {
+    it('derives a rolling 3-month start date', () => {
+      const { startDate } = getIntervalFromDateRange({ dateRange: '3m' });
+
+      expect(startDate).toEqual(subMonths(resetHours(new Date()), 3));
+    });
+
+    it('derives a rolling 6-month start date', () => {
+      const { startDate } = getIntervalFromDateRange({ dateRange: '6m' });
+
+      expect(startDate).toEqual(subMonths(resetHours(new Date()), 6));
+    });
+
+    it('respects a later explicit startDate (max clamping)', () => {
+      // Today is always after "3 months ago", so max() keeps the explicit date.
+      const explicitStart = resetHours(new Date());
+
+      const { startDate } = getIntervalFromDateRange({
+        dateRange: '3m',
+        startDate: explicitStart
+      });
+
+      expect(startDate).toEqual(explicitStart);
     });
   });
 });

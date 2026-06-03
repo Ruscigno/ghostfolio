@@ -7,6 +7,7 @@ import {
   startOfWeek,
   startOfYear,
   subDays,
+  subMonths,
   subYears
 } from 'date-fns';
 import { isFinite, isNumber } from 'lodash';
@@ -66,6 +67,12 @@ export function getIntervalFromDateRange(params: {
         startDate,
         subDays(startOfYear(resetHours(new Date())), 1)
       ]);
+      break;
+    case '3m':
+      startDate = max([startDate, subMonths(resetHours(new Date()), 3)]);
+      break;
+    case '6m':
+      startDate = max([startDate, subMonths(resetHours(new Date()), 6)]);
       break;
     case '1y':
       startDate = max([startDate, subYears(resetHours(new Date()), 1)]);
