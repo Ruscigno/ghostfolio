@@ -885,6 +885,8 @@ export abstract class PortfolioCalculator {
     // Make sure some key dates are present
     for (const dateRange of [
       '1d',
+      '1m',
+      '1w',
       '1y',
       '3m',
       '5y',

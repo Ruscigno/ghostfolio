@@ -1,5 +1,5 @@
 import { Big } from 'big.js';
-import { subMonths } from 'date-fns';
+import { subDays, subMonths } from 'date-fns';
 
 import {
   getAnnualizedPerformancePercent,
@@ -54,6 +54,18 @@ describe('CalculationHelper', () => {
   });
 
   describe('getIntervalFromDateRange', () => {
+    it('derives a rolling 1-week start date', () => {
+      const { startDate } = getIntervalFromDateRange({ dateRange: '1w' });
+
+      expect(startDate).toEqual(subDays(resetHours(new Date()), 7));
+    });
+
+    it('derives a rolling 1-month start date', () => {
+      const { startDate } = getIntervalFromDateRange({ dateRange: '1m' });
+
+      expect(startDate).toEqual(subMonths(resetHours(new Date()), 1));
+    });
+
     it('derives a rolling 3-month start date', () => {
       const { startDate } = getIntervalFromDateRange({ dateRange: '3m' });
 

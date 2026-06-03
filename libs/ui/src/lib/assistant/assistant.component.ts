@@ -32,7 +32,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { RouterModule } from '@angular/router';
 import { IonIcon } from '@ionic/angular/standalone';
 import { AssetClass, DataSource } from '@prisma/client';
-import { differenceInYears, eachYearOfInterval, format } from 'date-fns';
+import { eachYearOfInterval, format } from 'date-fns';
 import Fuse from 'fuse.js';
 import { addIcons } from 'ionicons';
 import {
@@ -374,12 +374,12 @@ export class GfAssistantComponent implements OnChanges, OnDestroy, OnInit {
         value: '1d'
       },
       {
-        label: $localize`Week to date` + ' (' + $localize`WTD` + ')',
-        value: 'wtd'
+        label: '1 ' + $localize`week` + ' (' + $localize`1W` + ')',
+        value: '1w'
       },
       {
-        label: $localize`Month to date` + ' (' + $localize`MTD` + ')',
-        value: 'mtd'
+        label: '1 ' + $localize`month` + ' (' + $localize`1M` + ')',
+        value: '1m'
       },
       {
         label: '3 ' + $localize`months` + ' (' + $localize`3M` + ')',
@@ -390,20 +390,10 @@ export class GfAssistantComponent implements OnChanges, OnDestroy, OnInit {
         value: '6m'
       },
       {
-        label: $localize`Year to date` + ' (' + $localize`YTD` + ')',
-        value: 'ytd'
-      }
-    ];
-
-    if (
-      this.user?.dateOfFirstActivity &&
-      differenceInYears(new Date(), this.user.dateOfFirstActivity) >= 1
-    ) {
-      this.dateRangeOptions.push({
         label: '1 ' + $localize`year` + ' (' + $localize`1Y` + ')',
         value: '1y'
-      });
-    }
+      }
+    ];
 
     if (this.user?.settings?.isExperimentalFeatures) {
       this.dateRangeOptions = this.dateRangeOptions.concat(
@@ -417,16 +407,6 @@ export class GfAssistantComponent implements OnChanges, OnDestroy, OnInit {
           .slice(0, -1)
           .reverse()
       );
-    }
-
-    if (
-      this.user?.dateOfFirstActivity &&
-      differenceInYears(new Date(), this.user.dateOfFirstActivity) >= 5
-    ) {
-      this.dateRangeOptions.push({
-        label: '5 ' + $localize`years` + ' (' + $localize`5Y` + ')',
-        value: '5y'
-      });
     }
 
     this.dateRangeOptions.push({

@@ -68,6 +68,12 @@ export function getIntervalFromDateRange(params: {
         subDays(startOfYear(resetHours(new Date())), 1)
       ]);
       break;
+    case '1w':
+      startDate = max([startDate, subDays(resetHours(new Date()), 7)]);
+      break;
+    case '1m':
+      startDate = max([startDate, subMonths(resetHours(new Date()), 1)]);
+      break;
     case '3m':
       startDate = max([startDate, subMonths(resetHours(new Date()), 3)]);
       break;
